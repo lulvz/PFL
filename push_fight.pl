@@ -4,8 +4,8 @@
 initial_board([
     [nonexistent, nonexistent, nonexistent, wall,  wall,         wall,         wall,  wall,        nonexistent, nonexistent],
     [nonexistent, nonexistent, nonexistent, empty, empty,        empty,        empty, empty,       nonexistent, nonexistent],
-    [nonexistent, empty,       empty,       empty, white_square, brown_square, empty, empty,       empty,       nonexistent],
-    [nonexistent, empty,       empty,       empty, white_square, brown_square, empty, empty,       empty,       nonexistent],
+    [nonexistent, empty,       empty,       empty, white_square, brown_round, empty, empty,       empty,       nonexistent],
+    [nonexistent, empty,       empty,       empty, white_round,  brown_square, empty, empty,       empty,       nonexistent],
     [nonexistent, nonexistent, empty,       empty, empty,        empty,        empty, nonexistent, nonexistent, nonexistent],
     [nonexistent, nonexistent, wall,        wall,  wall,         wall,         wall,  nonexistent, nonexistent, nonexistent]
 ]).
@@ -37,23 +37,27 @@ is_empty(empty).
 
 % Predicate to check if the move is valid.
 is_valid_move(Board, I, J, I2, J2, Player) :-
+    %  Check if the piece belongs to the player
+    player_pieces(Player, PlayerPieces),
     get_piece(Board, I, J, Piece),
+    member(Piece, PlayerPieces),
     get_piece(Board, I2, J2, Destination),
-    player_piece(Player, Piece),
     is_empty(Destination),
     is_valid_move_direction(Piece, I, J, I2, J2).
 
-% Predicate to check if a move is in a valid direction.
-is_valid_move_direction(white_round, I, J, I2, J2) :-
-    (I2 is I + 1, (J2 is J + 1 ; J2 is J - 1)).
-is_valid_move_direction(brown_round, I, J, I2, J2) :-
-    (I2 is I - 1, (J2 is J + 1 ; J2 is J - 1)).
-is_valid_move_direction(white_square, I, J, I2, J2) :-
-    (abs(I2 - I) =:= 1, abs(J2 - J) =:= 1).
-is_valid_move_direction(brown_square, I, J, I2, J2) :-
-    (abs(I2 - I) =:= 1, abs(J2 - J) =:= 1).
+is_valid_move_direction(_, _, _, _, _). % Any piece can move in any direction.
 
-display_cell(nonexistent) :- write('  '). % Nonexistent cells are not displayed.
+% Predicate to check if a move is in a valid direction.
+% is_valid_move_direction(white_round, I, J, I2, J2) :-
+%     (I2 is I + 1, (J2 is J + 1 ; J2 is J - 1)).
+% is_valid_move_direction(brown_round, I, J, I2, J2) :-
+%     (I2 is I - 1, (J2 is J + 1 ; J2 is J - 1)).
+% is_valid_move_direction(white_square, I, J, I2, J2) :-
+%     (abs(I2 - I) =:= 1, abs(J2 - J) =:= 1).
+% is_valid_move_direction(brown_square, I, J, I2, J2) :-
+%     (abs(I2 - I) =:= 1, abs(J2 - J) =:= 1).
+
+display_cell(nonexistent) :- write('0 '). % Nonexistent cells are not displayed.
 display_cell(wall) :- write('# ').
 display_cell(empty) :- write('. ').
 display_cell(white_round) :- write('w ').
@@ -102,30 +106,52 @@ play_game :-
     initial_board(Board),
     display_board(Board),
     player(white),
-    play(Board, white).
+    play(Board, white, 2). % Player starts with 2 moves available.
 
-play(Board, Player) :-
+play(Board, Player, 0) :- % When no more moves are left, transition to the push phase.
+    write('Push phase for '), write(Player), nl,
+    play_push(Board, Player).
+
+play(Board, Player, MovesLeft) :-
     write(Player), write('\'s turn.'), nl,
+    write('You have '), write(MovesLeft), write(' moves left.'), nl,
+    
     write('Enter the coordinates of the piece you want to move(eg. i-j.):'), nl,
     read(I-J),
     get_piece(Board, I, J, Piece),
     write('You selected: '), write(Piece), nl,
-    % Check if the piece belongs to the player.
+    % Check if the piece belongs to the player. 
+    % (redundant but just in case and makes errors faster to spot)
     player_pieces(Player, PlayerPieces),
     write('Player pieces: '), write(PlayerPieces), nl,
     (member(Piece, PlayerPieces) ->
         write('Enter the coordinates of the destination(eg. i-j.):'), nl,
         read(I2-J2),
+        % Print out piece at the destination
+        get_piece(Board, I2, J2, Destination),
+        write('Destination: '), write(Destination), nl,
         (is_valid_move(Board, I, J, I2, J2, Player) ->
             % Valid move, update the board
             set_piece(Board, I2, J2, Piece, NewBoard),
             remove_piece(NewBoard, I, J, NewBoard1),
             display_board(NewBoard1),
-            next_player(Player, NextPlayer),
-            play(NewBoard1, NextPlayer);
+            % next_player(Player, NextPlayer),
+            NewMovesLeft is MovesLeft - 1,
+            play(NewBoard1, Player, NewMovesLeft);
             write('Invalid move. Try again.'), nl,
-            play(Board, Player)
+            play(Board, Player, MovesLeft)
         );
         write('You cannot move this piece. Try again.'), nl,
-        play(Board, Player)
-    ).
+        play(Board, Player, MovesLeft)
+    ),
+
+    NewMovesLeft is MovesLeft - 1,
+    play(Board, NextPlayer, NewMovesLeft). % Continue the play phase.
+
+play_push(Board, Player) :-
+    write(Player), write('\'s push phase.'), nl,
+    
+    % todo push phase
+   
+    next_player(Player, NextPlayer),
+    play(Board, NextPlayer, 2). % Assuming players start with 2 moves in the next play phase.
