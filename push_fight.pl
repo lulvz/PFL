@@ -43,9 +43,63 @@ is_valid_move(Board, I, J, I2, J2, Player) :-
     member(Piece, PlayerPieces),
     get_piece(Board, I2, J2, Destination),
     is_empty(Destination),
-    is_valid_move_direction(Piece, I, J, I2, J2).
+    % is_valid_move_direction(Piece, I, J, I2, J2).
+    write('Validating move: '), write(Piece), write(' from '), write(I), write('-'), write(J), write(' to '), write(I2), write('-'), write(J2), nl,
+    is_clear_path(Board, I, J, I2, J2),
+    write('Clear path: '), write(I), write('-'), write(J), write(' to '), write(I2), write('-'), write(J2), nl.
 
 is_valid_move_direction(_, _, _, _, _). % Any piece can move in any direction.
+
+% Predicate to check if there is a clear path between two positions on the board.
+is_clear_path(Board, I1, J1, I2, J2) :-
+    % Horizontal move
+    (I1 = I2, abs(J1 - J2) > 1 ->
+        J_min is min(J1, J2),
+        J_max is max(J1, J2),
+        check_horizontal_path(Board, I1, J_min, J_max)
+    ;
+    % Vertical move
+    J1 = J2, abs(I1 - I2) > 1 ->
+        I_min is min(I1, I2),
+        I_max is max(I1, I2),
+        check_vertical_path(Board, I_min, I_max, J1)
+    ;
+    % Diagonal move
+    abs(I1 - I2) = abs(J1 - J2), abs(I1 - I2) > 1 ->
+        I_min is min(I1, I2),
+        I_max is max(I1, I2),
+        J_min is min(J1, J2),
+        J_max is max(J1, J2),
+        check_diagonal_path(Board, I_min, I_max, J_min, J_max)
+    ;
+    % Invalid move (not horizontal, vertical, or diagonal)
+    true
+    ).
+
+% Helper predicate to check if the horizontal path is clear.
+check_horizontal_path(_, _, J, J) :- !.
+check_horizontal_path(Board, I, J1, J2) :-
+    J_next is J1 + 1,
+    get_piece(Board, I, J_next, Piece),
+    is_empty(Piece),
+    check_horizontal_path(Board, I, J_next, J2).
+
+% Helper predicate to check if the vertical path is clear.
+check_vertical_path(_, I, I, _) :- !.
+check_vertical_path(Board, I1, I2, J) :-
+    I_next is I1 + 1,
+    get_piece(Board, I_next, J, Piece),
+    is_empty(Piece),
+    check_vertical_path(Board, I_next, I2, J).
+
+% Helper predicate to check if the diagonal path is clear.
+check_diagonal_path(_, I, I, J, J) :- !.
+check_diagonal_path(Board, I1, I2, J1, J2) :-
+    I_next is I1 + 1,
+    J_next is J1 + 1,
+    get_piece(Board, I_next, J_next, Piece),
+    is_empty(Piece),
+    check_diagonal_path(Board, I_next, I2, J_next, J2).
 
 % Predicate to check if a move is in a valid direction.
 % is_valid_move_direction(white_round, I, J, I2, J2) :-
@@ -146,7 +200,7 @@ play(Board, Player, MovesLeft) :-
     ),
 
     NewMovesLeft is MovesLeft - 1,
-    play(Board, NextPlayer, NewMovesLeft). % Continue the play phase.
+    play(Board, Player, NewMovesLeft). % Continue the play phase.
 
 play_push(Board, Player) :-
     write(Player), write('\'s push phase.'), nl,
