@@ -97,11 +97,11 @@ display_cell(brown_round) :- write('b ').
 display_cell(brown_square) :- write('B ').
 display_cell(red_anchor) :- write('A ').
 
-display_board([]).
-display_board([Row|Rest]) :-
+display_game([]).
+display_game([Row|Rest]) :-
     display_row(Row),
     nl,
-    display_board(Rest).
+    display_game(Rest).
 
 display_row([]).
 display_row([Cell|Rest]) :-
@@ -133,17 +133,17 @@ get_piece(Board, I, J, Piece) :-
     nth1(J, Row, Piece).
 
 %play
-play_game :-
+play :-
     initial_board(Board),
-    display_board(Board),
+    display_game(Board),
     player(white),
-    play(Board, white, 2). % Player starts with 2 moves available.
+    play_game(Board, white, 2). % Player starts with 2 moves available.
 
-play(Board, Player, 0) :- % When no more moves are left, transition to the push phase.
+play_game(Board, Player, 0) :- % When no more moves are left, transition to the push phase.
     write('Push phase for '), write(Player), nl,
     play_push(Board, Player).
 
-play(Board, Player, MovesLeft) :-
+play_game(Board, Player, MovesLeft) :-
     write(Player), write('\'s turn.'), nl,
     write('You have '), write(MovesLeft), write(' moves left.'), nl,
     
@@ -165,19 +165,19 @@ play(Board, Player, MovesLeft) :-
             % Valid move, update the board
             set_piece(Board, I2, J2, Piece, NewBoard),
             remove_piece(NewBoard, I, J, NewBoard1),
-            display_board(NewBoard1),
+            display_game(NewBoard1),
             % next_player(Player, NextPlayer),
             NewMovesLeft is MovesLeft - 1,
-            play(NewBoard1, Player, NewMovesLeft);
+            play_game(NewBoard1, Player, NewMovesLeft);
             write('Invalid move. Try again.'), nl,
-            play(Board, Player, MovesLeft)
+            play_game(Board, Player, MovesLeft)
         );
         write('You cannot move this piece. Try again.'), nl,
-        play(Board, Player, MovesLeft)
+        play_game(Board, Player, MovesLeft)
     ),
 
     NewMovesLeft is MovesLeft - 1,
-    play(Board, Player, NewMovesLeft). % Continue the play phase.
+    play_game(Board, Player, NewMovesLeft). % Continue the play_game phase.
 
 play_push(Board, Player) :-
     write(Player), write('\'s push phase.'), nl,
@@ -185,4 +185,4 @@ play_push(Board, Player) :-
     % todo push phase
    
     next_player(Player, NextPlayer),
-    play(Board, NextPlayer, 2). % Assuming players start with 2 moves in the next play phase.
+    play_game(Board, NextPlayer, 2). % Assuming players start with 2 moves in the next play_game phase.
