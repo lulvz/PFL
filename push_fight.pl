@@ -34,6 +34,7 @@ player_pieces(brown, [brown_round, brown_square]).
 
 % Predicate to check if a cell is empty or an anchor.
 is_empty(empty).
+is_empty(nonexistent). % Adding nonexistent as valid since you might need to check boundaries.
 
 % Predicate to check if the move is valid.
 is_valid_move(Board, I, J, I2, J2, Player) :-
@@ -52,54 +53,30 @@ is_valid_move_direction(_, _, _, _, _). % Any piece can move in any direction.
 
 % Predicate to check if there is a clear path between two positions on the board.
 is_clear_path(Board, I1, J1, I2, J2) :-
-    % Horizontal move
-    (I1 = I2, abs(J1 - J2) > 1 ->
-        J_min is min(J1, J2),
-        J_max is max(J1, J2),
-        check_horizontal_path(Board, I1, J_min, J_max)
-    ;
-    % Vertical move
-    J1 = J2, abs(I1 - I2) > 1 ->
-        I_min is min(I1, I2),
-        I_max is max(I1, I2),
-        check_vertical_path(Board, I_min, I_max, J1)
-    ;
-    % Diagonal move
-    abs(I1 - I2) = abs(J1 - J2), abs(I1 - I2) > 1 ->
-        I_min is min(I1, I2),
-        I_max is max(I1, I2),
-        J_min is min(J1, J2),
-        J_max is max(J1, J2),
-        check_diagonal_path(Board, I_min, I_max, J_min, J_max)
-    ;
-    % Invalid move (not horizontal, vertical, or diagonal)
-    true
-    ).
+    bfs(Board, [(I1, J1)], [], (I2, J2)).
 
-% Helper predicate to check if the horizontal path is clear.
-check_horizontal_path(_, _, J, J) :- !.
-check_horizontal_path(Board, I, J1, J2) :-
-    J_next is J1 + 1,
-    get_piece(Board, I, J_next, Piece),
-    is_empty(Piece),
-    check_horizontal_path(Board, I, J_next, J2).
+% BFS using a queue and a set of visited nodes.
+bfs(_, [], _, _) :-
+    !, fail. % Queue is empty; target not found.
+bfs(Board, [(I, J) | Rest], Visited, (I2, J2)) :-
+    (I = I2, J = J2) % Found the target.
+    ;
+    % Explore neighbors
+    findall((NI, NJ), 
+        (valid_neighbor(Board, I, J, NI, NJ),
+         \+ member((NI, NJ), Visited)), 
+    Neighbors),
+    append(Rest, Neighbors, NewQueue), % Add neighbors to the queue
+    bfs(Board, NewQueue, [(I, J) | Visited], (I2, J2)).
 
-% Helper predicate to check if the vertical path is clear.
-check_vertical_path(_, I, I, _) :- !.
-check_vertical_path(Board, I1, I2, J) :-
-    I_next is I1 + 1,
-    get_piece(Board, I_next, J, Piece),
-    is_empty(Piece),
-    check_vertical_path(Board, I_next, I2, J).
-
-% Helper predicate to check if the diagonal path is clear.
-check_diagonal_path(_, I, I, J, J) :- !.
-check_diagonal_path(Board, I1, I2, J1, J2) :-
-    I_next is I1 + 1,
-    J_next is J1 + 1,
-    get_piece(Board, I_next, J_next, Piece),
-    is_empty(Piece),
-    check_diagonal_path(Board, I_next, I2, J_next, J2).
+% Valid neighboring cells for movement.
+valid_neighbor(Board, I, J, NI, NJ) :-
+    (NI is I + 1, NJ is J;
+     NI is I - 1, NJ is J;
+     NI is I, NJ is J + 1;
+     NI is I, NJ is J - 1),
+    get_piece(Board, NI, NJ, Piece),
+    is_empty(Piece).
 
 % Predicate to check if a move is in a valid direction.
 % is_valid_move_direction(white_round, I, J, I2, J2) :-
