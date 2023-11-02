@@ -34,6 +34,7 @@ player_pieces(brown, [brown_round, brown_square]).
 
 % Predicate to check if a cell is empty or an anchor.
 is_empty(empty).
+is_empty(nonexistent). % Adding nonexistent as valid since you might need to check boundaries.
 
 % Predicate to check if the move is valid.
 is_valid_move(Board, I, J, I2, J2, Player) :-
@@ -43,9 +44,39 @@ is_valid_move(Board, I, J, I2, J2, Player) :-
     member(Piece, PlayerPieces),
     get_piece(Board, I2, J2, Destination),
     is_empty(Destination),
-    is_valid_move_direction(Piece, I, J, I2, J2).
+    % is_valid_move_direction(Piece, I, J, I2, J2).
+    write('Validating move: '), write(Piece), write(' from '), write(I), write('-'), write(J), write(' to '), write(I2), write('-'), write(J2), nl,
+    is_clear_path(Board, I, J, I2, J2),
+    write('Clear path: '), write(I), write('-'), write(J), write(' to '), write(I2), write('-'), write(J2), nl.
 
 is_valid_move_direction(_, _, _, _, _). % Any piece can move in any direction.
+
+% Predicate to check if there is a clear path between two positions on the board.
+is_clear_path(Board, I1, J1, I2, J2) :-
+    bfs(Board, [(I1, J1)], [], (I2, J2)).
+
+% BFS using a queue and a set of visited nodes.
+bfs(_, [], _, _) :-
+    !, fail. % Queue is empty; target not found.
+bfs(Board, [(I, J) | Rest], Visited, (I2, J2)) :-
+    (I = I2, J = J2) % Found the target.
+    ;
+    % Explore neighbors
+    findall((NI, NJ), 
+        (valid_neighbor(Board, I, J, NI, NJ),
+         \+ member((NI, NJ), Visited)), 
+    Neighbors),
+    append(Rest, Neighbors, NewQueue), % Add neighbors to the queue
+    bfs(Board, NewQueue, [(I, J) | Visited], (I2, J2)).
+
+% Valid neighboring cells for movement.
+valid_neighbor(Board, I, J, NI, NJ) :-
+    (NI is I + 1, NJ is J;
+     NI is I - 1, NJ is J;
+     NI is I, NJ is J + 1;
+     NI is I, NJ is J - 1),
+    get_piece(Board, NI, NJ, Piece),
+    is_empty(Piece).
 
 % Predicate to check if a move is in a valid direction.
 % is_valid_move_direction(white_round, I, J, I2, J2) :-
@@ -146,7 +177,7 @@ play(Board, Player, MovesLeft) :-
     ),
 
     NewMovesLeft is MovesLeft - 1,
-    play(Board, NextPlayer, NewMovesLeft). % Continue the play phase.
+    play(Board, Player, NewMovesLeft). % Continue the play phase.
 
 play_push(Board, Player) :-
     write(Player), write('\'s push phase.'), nl,
