@@ -146,58 +146,77 @@ get_piece(Board, I, J, Piece) :-
     nth1(I, Board, Row),
     nth1(J, Row, Piece).
 
+% Move Validation and Execution
+% move(+GameState, +Move, -NewGameState)
+% Move format: move([FromRow, FromCol, ToRow, ToCol])
+move(GameState, Move, NewGameState) :-
+    GameState = [Board, Player, MovesLeft, PiecesLeft],
+    MovesLeft > 0, % There are moves left for the current player.
+
+    Move = [FromRow, FromCol, ToRow, ToCol],
+
+    get_piece(Board, FromRow, FromCol, Piece),
+    player_pieces(Player, PlayerPieces),
+
+    (member(Piece, PlayerPieces) ->
+        get_piece(Board, ToRow, ToCol, Destination),
+        is_empty(Destination),
+
+        (is_clear_path(Board, FromRow, FromCol, ToRow, ToCol) ->
+            set_piece(Board, ToRow, ToCol, Piece, NewBoard),
+            remove_piece(NewBoard, FromRow, FromCol, NewBoard1),
+            NewMovesLeft is MovesLeft - 1,
+            NewGameState = [NewBoard1, Player, NewMovesLeft, PiecesLeft],
+            display_game(NewGameState), % Display the updated game state
+
+            % Check if the player has won
+            (PiecesLeft = [0, 0] ->
+                write('Player '), write(Player), write(' has won!'), nl,
+                abort
+
+            % Continue the play_game phase
+            ;
+                true
+            )
+
+        ;
+        write('Invalid move. Try again.'), nl,
+        NewGameState = GameState % Return the original game state
+        )
+    ;
+    write('You cannot move this piece. Try again.'), nl,
+    NewGameState = GameState % Return the original game state
+    ).
+
 % Update the 'play' predicate to use GameState
 play :-
     initial_state(_, GameState), % Initialize the game state
     display_game(GameState), % Display the initial game state
     play_game(GameState).
 
-% Update 'play_game' to work with GameState
-play_game(GameState) :-
-    GameState = [Board, Player, MovesLeft, _],
-    MovesLeft = 0, % When no more moves are left, transition to the push phase.
-    write('Push phase for '), write(Player), nl,
-    play_push(Board, Player).
-
+% Update 'play_game' to use 'move' predicate
 play_game(GameState) :-
     GameState = [Board, Player, MovesLeft, PiecesLeft],
-    MovesLeft > 0, % When there are moves left for the current player.
-    % write(Player), write('\'s turn.'), nl,
-    % write('You have '), write(MovesLeft), write(' moves left.'), nl,
-    
-    write('Enter the coordinates of the piece you want to move(eg. i-j.):'), nl,
-    read(I-J),
-    get_piece(Board, I, J, Piece),
-    write('You selected: '), write(Piece), nl,
-    
-    player_pieces(Player, PlayerPieces),
-    write('Player pieces: '), write(PlayerPieces), nl,
-    
-    (member(Piece, PlayerPieces) ->
+
+    (MovesLeft = 0 -> % When no more moves are left, transition to the push phase.
+        play_push(GameState)
+    ;
+        write('Enter the coordinates of the piece you want to move(eg. i-j.):'), nl,
+        read(I-J),
         write('Enter the coordinates of the destination(eg. i-j.):'), nl,
         read(I2-J2),
-        get_piece(Board, I2, J2, Destination),
-        write('Destination: '), write(Destination), nl,
-        
-        (is_valid_move(Board, I, J, I2, J2, Player) ->
-            set_piece(Board, I2, J2, Piece, NewBoard),
-            remove_piece(NewBoard, I, J, NewBoard1),
-            NewMovesLeft is MovesLeft - 1,
-            NewGameState = [NewBoard1, Player, NewMovesLeft, PiecesLeft],
-            display_game(NewGameState),
-            play_game(NewGameState); % Continue the play_game phase.
-            
-            write('Invalid move. Try again.'), nl,
-            play_game(GameState)
-        );
-        write('You cannot move this piece. Try again.'), nl,
-        play_game(GameState)
+
+        % Construct the Move
+        Move = [I, J, I2, J2],
+
+        % Validate and execute the move
+        move(GameState, Move, NewGameState),
+
+        % Continue the play_game phase
+        play_game(NewGameState)
     ).
 
-play_push(Board, Player) :-
-    write(Player), write('\'s push phase.'), nl,
-    
+play_push(GameState) :-
+    GameState = [Board, Player, MovesLeft, PiecesLeft],
+    write('Push phase for '), write(Player), nl.
     % todo push phase
-   
-    next_player(Player, NextPlayer),
-    play_game(Board, NextPlayer, 2). % Assuming players start with 2 moves in the next play_game phase.
