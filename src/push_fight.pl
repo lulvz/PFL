@@ -1,6 +1,6 @@
 :- use_module(library(lists)).
 
-% Initialize the game board as a 4x8 matrix.
+% Initialize the game board as a 6x10 matrix.
 initial_board([
     [nonexistent, nonexistent, nonexistent, wall,  wall,         wall,         wall,  wall,        nonexistent, nonexistent],
     [nonexistent, nonexistent, nonexistent, empty, empty,        empty,        empty, empty,       nonexistent, nonexistent],
@@ -10,7 +10,7 @@ initial_board([
     [nonexistent, nonexistent, wall,        wall,  wall,         wall,         wall,  nonexistent, nonexistent, nonexistent]
 ]).
 
-% Define player colors.
+% Define players
 player(white).
 player(brown).
 
@@ -32,9 +32,34 @@ piece(red_anchor).
 player_pieces(white, [white_round, white_square]).
 player_pieces(brown, [brown_round, brown_square]).
 
+% Gamestate([Board, Player, MovesLeft, PiecesLeft]) PiecesLeft is a list of the number of pieces left for each player.
+% Game state that contains the board, curren player, number of moves left, if user is in push phase, and the number of pieces left for each player.
+% initial_state(+Size, -GameState) Size is not used because the board of this game is kinda weird.
+initial_state(Size, GameState) :-
+    initial_board(Board),
+    player(white),
+    GameState = [Board, white, 2, [2, 2]]. % Assuming players start with 2 moves.
+
+% display_game(+GameState)
+display_game(GameState) :-
+    GameState = [Board, Player, MovesLeft, PiecesLeft],
+
+    % Padding
+    write('#############################################'), nl,
+
+    write('Player: '), write(Player), nl,
+    % if moves left is 0, then the player is in the push phase.
+    (MovesLeft = 0 -> write('Push phase.'), nl; write('Play phase, moves left: '), write(MovesLeft), nl),
+    % white pieces is the first element in PiecesLeft, brown pieces is the second element.
+    % write the number of pieces left for each player.
+    write('Pieces left [white,brown]: '), write(PiecesLeft), nl,
+    
+    display_board(Board),
+
+    write('#############################################'), nl.
+
 % Predicate to check if a cell is empty or an anchor.
 is_empty(empty).
-is_empty(nonexistent). % Adding nonexistent as valid since you might need to check boundaries.
 
 % Predicate to check if the move is valid.
 is_valid_move(Board, I, J, I2, J2, Player) :-
@@ -44,7 +69,6 @@ is_valid_move(Board, I, J, I2, J2, Player) :-
     member(Piece, PlayerPieces),
     get_piece(Board, I2, J2, Destination),
     is_empty(Destination),
-    % is_valid_move_direction(Piece, I, J, I2, J2).
     write('Validating move: '), write(Piece), write(' from '), write(I), write('-'), write(J), write(' to '), write(I2), write('-'), write(J2), nl,
     is_clear_path(Board, I, J, I2, J2),
     write('Clear path: '), write(I), write('-'), write(J), write(' to '), write(I2), write('-'), write(J2), nl.
@@ -78,16 +102,6 @@ valid_neighbor(Board, I, J, NI, NJ) :-
     get_piece(Board, NI, NJ, Piece),
     is_empty(Piece).
 
-% Predicate to check if a move is in a valid direction.
-% is_valid_move_direction(white_round, I, J, I2, J2) :-
-%     (I2 is I + 1, (J2 is J + 1 ; J2 is J - 1)).
-% is_valid_move_direction(brown_round, I, J, I2, J2) :-
-%     (I2 is I - 1, (J2 is J + 1 ; J2 is J - 1)).
-% is_valid_move_direction(white_square, I, J, I2, J2) :-
-%     (abs(I2 - I) =:= 1, abs(J2 - J) =:= 1).
-% is_valid_move_direction(brown_square, I, J, I2, J2) :-
-%     (abs(I2 - I) =:= 1, abs(J2 - J) =:= 1).
-
 display_cell(nonexistent) :- write('0 '). % Nonexistent cells are not displayed.
 display_cell(wall) :- write('# ').
 display_cell(empty) :- write('. ').
@@ -97,11 +111,11 @@ display_cell(brown_round) :- write('b ').
 display_cell(brown_square) :- write('B ').
 display_cell(red_anchor) :- write('A ').
 
-display_game([]).
-display_game([Row|Rest]) :-
+display_board([]).
+display_board([Row|Rest]) :-
     display_row(Row),
     nl,
-    display_game(Rest).
+    display_board(Rest).
 
 display_row([]).
 display_row([Cell|Rest]) :-
@@ -132,57 +146,77 @@ get_piece(Board, I, J, Piece) :-
     nth1(I, Board, Row),
     nth1(J, Row, Piece).
 
-%play
-play :-
-    initial_board(Board),
-    display_game(Board),
-    player(white),
-    play_game(Board, white, 2). % Player starts with 2 moves available.
+% Move Validation and Execution
+% move(+GameState, +Move, -NewGameState)
+% Move format: move([FromRow, FromCol, ToRow, ToCol])
+move(GameState, Move, NewGameState) :-
+    GameState = [Board, Player, MovesLeft, PiecesLeft],
+    MovesLeft > 0, % There are moves left for the current player.
 
-play_game(Board, Player, 0) :- % When no more moves are left, transition to the push phase.
-    write('Push phase for '), write(Player), nl,
-    play_push(Board, Player).
+    Move = [FromRow, FromCol, ToRow, ToCol],
 
-play_game(Board, Player, MovesLeft) :-
-    write(Player), write('\'s turn.'), nl,
-    write('You have '), write(MovesLeft), write(' moves left.'), nl,
-    
-    write('Enter the coordinates of the piece you want to move(eg. i-j.):'), nl,
-    read(I-J),
-    get_piece(Board, I, J, Piece),
-    write('You selected: '), write(Piece), nl,
-    % Check if the piece belongs to the player. 
-    % (redundant but just in case and makes errors faster to spot)
+    get_piece(Board, FromRow, FromCol, Piece),
     player_pieces(Player, PlayerPieces),
-    write('Player pieces: '), write(PlayerPieces), nl,
+
     (member(Piece, PlayerPieces) ->
+        get_piece(Board, ToRow, ToCol, Destination),
+        is_empty(Destination),
+
+        (is_clear_path(Board, FromRow, FromCol, ToRow, ToCol) ->
+            set_piece(Board, ToRow, ToCol, Piece, NewBoard),
+            remove_piece(NewBoard, FromRow, FromCol, NewBoard1),
+            NewMovesLeft is MovesLeft - 1,
+            NewGameState = [NewBoard1, Player, NewMovesLeft, PiecesLeft],
+            display_game(NewGameState), % Display the updated game state
+
+            % Check if the player has won
+            (PiecesLeft = [0, 0] ->
+                write('Player '), write(Player), write(' has won!'), nl,
+                abort
+
+            % Continue the play_game phase
+            ;
+                true
+            )
+
+        ;
+        write('Invalid move. Try again.'), nl,
+        NewGameState = GameState % Return the original game state
+        )
+    ;
+    write('You cannot move this piece. Try again.'), nl,
+    NewGameState = GameState % Return the original game state
+    ).
+
+% Update the 'play' predicate to use GameState
+play :-
+    initial_state(_, GameState), % Initialize the game state
+    display_game(GameState), % Display the initial game state
+    play_game(GameState).
+
+% Update 'play_game' to use 'move' predicate
+play_game(GameState) :-
+    GameState = [Board, Player, MovesLeft, PiecesLeft],
+
+    (MovesLeft = 0 -> % When no more moves are left, transition to the push phase.
+        play_push(GameState)
+    ;
+        write('Enter the coordinates of the piece you want to move(eg. i-j.):'), nl,
+        read(I-J),
         write('Enter the coordinates of the destination(eg. i-j.):'), nl,
         read(I2-J2),
-        % Print out piece at the destination
-        get_piece(Board, I2, J2, Destination),
-        write('Destination: '), write(Destination), nl,
-        (is_valid_move(Board, I, J, I2, J2, Player) ->
-            % Valid move, update the board
-            set_piece(Board, I2, J2, Piece, NewBoard),
-            remove_piece(NewBoard, I, J, NewBoard1),
-            display_game(NewBoard1),
-            % next_player(Player, NextPlayer),
-            NewMovesLeft is MovesLeft - 1,
-            play_game(NewBoard1, Player, NewMovesLeft);
-            write('Invalid move. Try again.'), nl,
-            play_game(Board, Player, MovesLeft)
-        );
-        write('You cannot move this piece. Try again.'), nl,
-        play_game(Board, Player, MovesLeft)
-    ),
 
-    NewMovesLeft is MovesLeft - 1,
-    play_game(Board, Player, NewMovesLeft). % Continue the play_game phase.
+        % Construct the Move
+        Move = [I, J, I2, J2],
 
-play_push(Board, Player) :-
-    write(Player), write('\'s push phase.'), nl,
-    
+        % Validate and execute the move
+        move(GameState, Move, NewGameState),
+
+        % Continue the play_game phase
+        play_game(NewGameState)
+    ).
+
+play_push(GameState) :-
+    GameState = [Board, Player, MovesLeft, PiecesLeft],
+    write('Push phase for '), write(Player), nl.
     % todo push phase
-   
-    next_player(Player, NextPlayer),
-    play_game(Board, NextPlayer, 2). % Assuming players start with 2 moves in the next play_game phase.
