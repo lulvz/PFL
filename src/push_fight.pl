@@ -79,9 +79,11 @@ is_valid_move_direction(_, _, _, _, _). % Any piece can move in any direction.
 is_clear_path(Board, I1, J1, I2, J2) :-
     bfs(Board, [(I1, J1)], [], (I2, J2)).
 
+is_clear_path(_, _, _, _, _) :- false. % No path found.
+
 % BFS using a queue and a set of visited nodes.
-bfs(_, [], _, _) :-
-    !, fail. % Queue is empty; target not found.
+bfs(_, [], _, _) :- false. % Queue is empty, no path found.
+
 bfs(Board, [(I, J) | Rest], Visited, (I2, J2)) :-
     (I = I2, J = J2) % Found the target.
     ;
@@ -101,6 +103,15 @@ valid_neighbor(Board, I, J, NI, NJ) :-
      NI is I, NJ is J - 1),
     get_piece(Board, NI, NJ, Piece),
     is_empty(Piece).
+
+valid_neighbor_push(Board, I, J, NI, NJ) :-
+    (NI is I + 1, NJ is J;
+     NI is I - 1, NJ is J;
+     NI is I, NJ is J + 1;
+     NI is I, NJ is J - 1),
+    get_piece(Board, NI, NJ, Piece),
+    % Can only push pieces that belong to players
+    (Piece = white_round; Piece = white_square; Piece = brown_round; Piece = brown_square).
 
 display_cell(nonexistent) :- write('0 '). % Nonexistent cells are not displayed.
 display_cell(wall) :- write('# ').
@@ -146,12 +157,37 @@ get_piece(Board, I, J, Piece) :-
     nth1(I, Board, Row),
     nth1(J, Row, Piece).
 
+% Predicate to push a piece in the direction of another piece.
+push_piece(Board, FromRow, FromCol, ToRow, ToCol, NewBoard) :-
+    get_piece(Board, FromRow, FromCol, Piece),
+    valid_direction(FromRow, FromCol, ToRow, ToCol, Direction),
+    push_pieces_in_direction(Board, FromRow, FromCol, Direction, NewBoard).
+
+% Define valid directions for pushing (up, down, left, right).
+valid_direction(FromRow, FromCol, ToRow, ToCol, up) :-
+    FromRow > ToRow,
+    FromCol = ToCol.
+valid_direction(FromRow, FromCol, ToRow, ToCol, down) :-
+    FromRow < ToRow,
+    FromCol = ToCol.
+valid_direction(FromRow, FromCol, ToRow, ToCol, left) :-
+    FromRow = ToRow,
+    FromCol > ToCol.
+valid_direction(FromRow, FromCol, ToRow, ToCol, right) :-
+    FromRow = ToRow,
+    FromCol < ToCol.
+
+% Shifts all game pieces touching the start one in a given direction. (white_square, brown_square, white_round, brown_round)
+push_pieces_in_direction(Board, FromRow, FromCol, Direction, NewBoard) :-
+    write('Pushing pieces in direction: '), write(Direction), nl,
+    % return the board
+    NewBoard = Board.
+
 % Move Validation and Execution
 % move(+GameState, +Move, -NewGameState)
 % Move format: move([FromRow, FromCol, ToRow, ToCol])
 move(GameState, Move, NewGameState) :-
     GameState = [Board, Player, MovesLeft, PiecesLeft],
-    MovesLeft > 0, % There are moves left for the current player.
 
     Move = [FromRow, FromCol, ToRow, ToCol],
 
@@ -159,48 +195,70 @@ move(GameState, Move, NewGameState) :-
     player_pieces(Player, PlayerPieces),
 
     (member(Piece, PlayerPieces) ->
-        get_piece(Board, ToRow, ToCol, Destination),
-        is_empty(Destination),
 
-        (is_clear_path(Board, FromRow, FromCol, ToRow, ToCol) ->
-            set_piece(Board, ToRow, ToCol, Piece, NewBoard),
-            remove_piece(NewBoard, FromRow, FromCol, NewBoard1),
-            NewMovesLeft is MovesLeft - 1,
-            NewGameState = [NewBoard1, Player, NewMovesLeft, PiecesLeft],
-            display_game(NewGameState), % Display the updated game state
+        (MovesLeft > 0 -> % There are moves left for the current player.
+            (is_clear_path(Board, FromRow, FromCol, ToRow, ToCol) ->
+                set_piece(Board, ToRow, ToCol, Piece, NewBoard),
+                remove_piece(NewBoard, FromRow, FromCol, NewBoard1),
+                NewMovesLeft is MovesLeft - 1,
+                NewGameState = [NewBoard1, Player, NewMovesLeft, PiecesLeft],
 
-            % Check if the player has won
-            (PiecesLeft = [0, 0] ->
-                write('Player '), write(Player), write(' has won!'), nl,
-                abort
+                % Check if the player has won
+                (PiecesLeft = [0, 0] ->
+                    write('Player '), write(Player), write(' has won!'), nl,
+                    abort
 
-            % Continue the play_game phase
+                % Continue the play_game phase
+                ;
+                    true
+                )
+
             ;
-                true
+                write('Invalid move. Try again.'), nl,
+                NewGameState = GameState % Return the original game state
             )
-
         ;
-        write('Invalid move. Try again.'), nl,
-        NewGameState = GameState % Return the original game state
+            write('aadsfasdf'), nl,
+            % Push phase
+            % validate piece is a square
+            ((Piece = white_square; Piece = brown_square) ->
+                write('Validating push: '), write(Piece), write(' from '), write(FromRow), write('-'), write(FromCol), write(' to '), write(ToRow), write('-'), write(ToCol), nl,
+                % validate the piece is adjacent to another piece
+                (valid_neighbor_push(Board, FromRow, FromCol, ToRow, ToCol) ->
+                    % Push the piece in the direction of the second piece
+                    push_piece(Board, FromRow, FromCol, ToRow, ToCol, NewBoard),
+
+                    % advance to next player
+                    next_player(Player, NextPlayer),
+                    NewGameState = [NewBoard, NextPlayer, 2, PiecesLeft]
+                ;
+                    write('Invalid second piece.'), nl,
+                    NewGameState = GameState % Return the original game state
+                )
+            ;
+                write('You can only push with squares.'), nl,
+                NewGameState = GameState % Return the original game state
+            )
         )
     ;
-    write('You cannot move this piece. Try again.'), nl,
-    NewGameState = GameState % Return the original game state
+        write('You cannot move this piece. Try again.'), nl,
+        NewGameState = GameState % Return the original game state
     ).
 
 % Update the 'play' predicate to use GameState
 play :-
     initial_state(_, GameState), % Initialize the game state
-    display_game(GameState), % Display the initial game state
+    % display_game(GameState), % Display the initial game state
     play_game(GameState).
 
 % Update 'play_game' to use 'move' predicate
 play_game(GameState) :-
     GameState = [Board, Player, MovesLeft, PiecesLeft],
 
-    (MovesLeft = 0 -> % When no more moves are left, transition to the push phase.
-        play_push(GameState)
-    ;
+    (MovesLeft > 0 -> % There are moves left for the current player.
+        % Display the game state
+        display_game(GameState),
+
         write('Enter the coordinates of the piece you want to move(eg. i-j.):'), nl,
         read(I-J),
         write('Enter the coordinates of the destination(eg. i-j.):'), nl,
@@ -214,9 +272,21 @@ play_game(GameState) :-
 
         % Continue the play_game phase
         play_game(NewGameState)
-    ).
+    ;
+        % Display the game state
+        display_game(GameState),
 
-play_push(GameState) :-
-    GameState = [Board, Player, MovesLeft, PiecesLeft],
-    write('Push phase for '), write(Player), nl.
-    % todo push phase
+        write('Enter the coordinates of the piece you want to push(eg. i-j.):'), nl,
+        read(I-J),
+        write('Enter the coordinates of an adjacent piece to push(eg. i-j.):'), nl,
+        read(I2-J2),
+
+        % Construct the Move
+        Move = [I, J, I2, J2],
+
+        % Validate and execute the move
+        move(GameState, Move, NewGameState),
+
+        % Continue the play_game phase
+        play_game(NewGameState)   
+    ).
