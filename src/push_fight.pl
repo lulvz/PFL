@@ -32,17 +32,18 @@ piece(red_anchor).
 player_pieces(white, [white_round, white_square]).
 player_pieces(brown, [brown_round, brown_square]).
 
-% Gamestate([Board, Player, MovesLeft, PiecesLeft]) PiecesLeft is a list of the number of pieces left for each player.
+% Gamestate([Board, Player, MovesLeft, PiecesLeft], Anchor) PiecesLeft is a list of the number of pieces left for each player.
+% Anchor is the cell that the anchor is currently on top of (can only be squares)
 % Game state that contains the board, curren player, number of moves left, if user is in push phase, and the number of pieces left for each player.
 % initial_state(+Size, -GameState) Size is not used because the board of this game is kinda weird.
 initial_state(Size, GameState) :-
     initial_board(Board),
     player(white),
-    GameState = [Board, white, 2, [2, 2]]. % Assuming players start with 2 moves.
+    GameState = [Board, white, 2, [2, 2], nonexistent].
 
 % display_game(+GameState)
 display_game(GameState) :-
-    GameState = [Board, Player, MovesLeft, PiecesLeft],
+    GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor],
 
     % Padding
     write('#############################################'), nl,
@@ -53,6 +54,7 @@ display_game(GameState) :-
     % white pieces is the first element in PiecesLeft, brown pieces is the second element.
     % write the number of pieces left for each player.
     write('Pieces left [white,brown]: '), write(PiecesLeft), nl,
+    write('Anchor currently on top of: '), display_cell(Anchor), nl,
     
     display_board(Board),
 
@@ -187,7 +189,7 @@ push_pieces_in_direction(Board, FromRow, FromCol, Direction, NewBoard) :-
 % move(+GameState, +Move, -NewGameState)
 % Move format: move([FromRow, FromCol, ToRow, ToCol])
 move(GameState, Move, NewGameState) :-
-    GameState = [Board, Player, MovesLeft, PiecesLeft],
+    GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor],
 
     Move = [FromRow, FromCol, ToRow, ToCol],
 
@@ -201,7 +203,7 @@ move(GameState, Move, NewGameState) :-
                 set_piece(Board, ToRow, ToCol, Piece, NewBoard),
                 remove_piece(NewBoard, FromRow, FromCol, NewBoard1),
                 NewMovesLeft is MovesLeft - 1,
-                NewGameState = [NewBoard1, Player, NewMovesLeft, PiecesLeft],
+                NewGameState = [NewBoard1, Player, NewMovesLeft, PiecesLeft, Anchor],
 
                 % Check if the player has won
                 (PiecesLeft = [0, 0] ->
@@ -230,7 +232,7 @@ move(GameState, Move, NewGameState) :-
 
                     % advance to next player
                     next_player(Player, NextPlayer),
-                    NewGameState = [NewBoard, NextPlayer, 2, PiecesLeft]
+                    NewGameState = [NewBoard, NextPlayer, 2, PiecesLeft, Anchor]
                 ;
                     write('Invalid second piece.'), nl,
                     NewGameState = GameState % Return the original game state
@@ -253,7 +255,7 @@ play :-
 
 % Update 'play_game' to use 'move' predicate
 play_game(GameState) :-
-    GameState = [Board, Player, MovesLeft, PiecesLeft],
+    GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor],
 
     (MovesLeft > 0 -> % There are moves left for the current player.
         % Display the game state
