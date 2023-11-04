@@ -4,7 +4,7 @@
 initial_board([
     [nonexistent, nonexistent, nonexistent, wall,  wall,         wall,         wall,  wall,        nonexistent, nonexistent],
     [nonexistent, nonexistent, nonexistent, empty, empty,        empty,        empty, empty,       nonexistent, nonexistent],
-    [nonexistent, empty,       empty,       empty, white_square, brown_round, empty, empty,       empty,       nonexistent],
+    [nonexistent, empty,       empty,       empty, white_square, brown_round, nonexistent, empty,       empty,       nonexistent],
     [nonexistent, empty,       empty,       empty, white_round,  brown_square, empty, empty,       empty,       nonexistent],
     [nonexistent, nonexistent, empty,       empty, empty,        empty,        empty, nonexistent, nonexistent, nonexistent],
     [nonexistent, nonexistent, wall,        wall,  wall,         wall,         wall,  nonexistent, nonexistent, nonexistent]
@@ -161,12 +161,13 @@ get_piece(Board, I, J, Piece) :-
     nth1(J, Row, Piece).
 
 % Predicate to push a piece in the direction of another piece.
-push_piece(Board, FromRow, FromCol, ToRow, ToCol, NewBoard) :-
+push_piece(GameState, FromRow, FromCol, ToRow, ToCol, NewGameState) :-
+    GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
     get_piece(Board, FromRow, FromCol, Piece),
     valid_direction(FromRow, FromCol, ToRow, ToCol, Direction),
     % write the direction of the push
     write('Pushing '), write(Piece), write(' from '), write(FromRow), write('-'), write(FromCol), write(' to '), write(ToRow), write('-'), write(ToCol), write(' in direction '), write(Direction), nl,
-    push_pieces_in_direction(Board, FromRow, FromCol, Direction, NewBoard).
+    push_pieces_in_direction(GameState, FromRow, FromCol, Direction, NewGameState).
 
 % Define valid directions for pushing (up, down, left, right).
 valid_direction(FromRow, FromCol, ToRow, ToCol, up) :-
@@ -183,15 +184,17 @@ valid_direction(FromRow, FromCol, ToRow, ToCol, right) :-
     FromCol < ToCol.
 
 % Predicate to push a piece in the direction of another piece.
-push_pieces_in_direction(Board, FromRow, FromCol, Direction, NewBoard) :-
+push_pieces_in_direction(GameState, FromRow, FromCol, Direction, NewGameState) :-
+    GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
     get_piece(Board, FromRow, FromCol, Piece),
-    push_recursive(Board, FromRow, FromCol, Direction, Piece, NewBoard).
+    push_recursive(GameState, FromRow, FromCol, Direction, Piece, NewGameState).
 
 % Base case: No more pieces to push
 % push_recursive(Board, _, _, _, _, Board).
 
 % Recursive case: Push pieces in the specified direction
-push_recursive(Board, Row, Col, Direction, Piece, NewBoard) :-
+push_recursive(GameState, Row, Col, Direction, Piece, NewGameState) :-
+    GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
     write('Direction: '), write(Direction), nl,
     valid_direction_push(Direction),
     write('Valid direction: '), write(Direction), nl,
@@ -204,13 +207,36 @@ push_recursive(Board, Row, Col, Direction, Piece, NewBoard) :-
     ((NewPiece == white_round; NewPiece == white_square; NewPiece == brown_round; NewPiece == brown_square) ->
         write('Got in here'), nl,
         set_piece(Board, NewRow, NewCol, Piece, TempBoard),
+        TempGameState = [TempBoard, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
         remove_piece(TempBoard, Row, Col, TempBoard2),
-        push_recursive(TempBoard2, NewRow, NewCol, Direction, NewPiece, NewBoard)
+        TempGameState2 = [TempBoard2, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
+        push_recursive(TempGameState2, NewRow, NewCol, Direction, NewPiece, NewGameState)
     ;
         (is_empty(NewPiece) ->
-            set_piece(Board, NewRow, NewCol, Piece, NewBoard)
+            set_piece(Board, NewRow, NewCol, Piece, NewBoard),
+            NewGameState = [NewBoard, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition]
         ;
-        NewBoard = Board
+        
+            ((NewPiece == nonexistent) ->
+                % The Piece we are holding in the function essentially disappears and we decrease the piece count of the player that has the piece we are holding
+                % PiecesLeft = [WhitePiecesLeft, BrownPiecesLeft]
+                PiecesLeft = [WhitePiecesLeft, BrownPiecesLeft],
+                write('Pieces left: '), write(PiecesLeft), nl,
+
+                ((Piece == white_round; Piece == white_square) ->
+                    write('White piece'), nl,
+                    NewWhitePiecesLeft is WhitePiecesLeft - 1,
+                    NewPiecesLeft = [NewWhitePiecesLeft, BrownPiecesLeft]
+                ;
+                    write('Brown piece'), nl,
+                    NewBrownPiecesLeft is BrownPiecesLeft - 1,
+                    write('New brown pieces left: '), write(NewBrownPiecesLeft), nl,
+                    NewPiecesLeft = [WhitePiecesLeft, NewBrownPiecesLeft]
+                ),
+                NewGameState = [Board, Player, MovesLeft, NewPiecesLeft, Anchor, AnchorPosition]
+            ;
+                NewGameState = GameState
+            )
         )
     ).
 
@@ -273,11 +299,12 @@ move(GameState, Move, NewGameState) :-
                 % validate the piece is adjacent to another piece
                 (valid_neighbor_push(Board, FromRow, FromCol, ToRow, ToCol) ->
                     % Push the piece in the direction of the second piece
-                    push_piece(Board, FromRow, FromCol, ToRow, ToCol, NewBoard),
+                    push_piece(GameState, FromRow, FromCol, ToRow, ToCol, TempGameState),
+                    TempGameState = [NewBoard, Player, MovesLeft, NewPiecesLeft, Anchor, AnchorPosition],
 
                     % advance to next player
                     next_player(Player, NextPlayer),
-                    NewGameState = [NewBoard, NextPlayer, 2, PiecesLeft, Anchor, AnchorPosition]
+                    NewGameState = [NewBoard, NextPlayer, 2, NewPiecesLeft, Anchor, AnchorPosition]
                 ;
                     write('Invalid second piece.'), nl,
                     NewGameState = GameState % Return the original game state
