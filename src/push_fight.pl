@@ -123,13 +123,19 @@ display_cell(white_round) :- write('w ').
 display_cell(white_square) :- write('W ').
 display_cell(brown_round) :- write('b ').
 display_cell(brown_square) :- write('B ').
-display_cell(red_anchor) :- write('A ').
+display_cell(red_anchor) :- write('A ').   
 
-display_board([]).
-display_board([Row|Rest]) :-
+display_board(Board) :-
+    write('  1 2 3 4 5 6 7 8 9 10'), nl,
+    display_board(Board, 1). % Start with row number 1
+
+display_board([], _).
+display_board([Row|Rest], RowNumber) :-
+    write(RowNumber), write(' '), % Write the row number
     display_row(Row),
+    NextRowNumber is RowNumber + 1,
     nl,
-    display_board(Rest).
+    display_board(Rest, NextRowNumber).
 
 display_row([]).
 display_row([Cell|Rest]) :-
