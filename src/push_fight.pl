@@ -170,11 +170,21 @@ get_piece(Board, I, J, Piece) :-
 push_piece(GameState, FromRow, FromCol, ToRow, ToCol, NewGameState) :-
     GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
     get_piece(Board, FromRow, FromCol, Piece),
+    FromRow1 = FromRow, FromCol1 = FromCol, ToRow1 = ToRow, ToCol1 = ToCol, Piece1 = Piece,
     valid_direction(FromRow, FromCol, ToRow, ToCol, Direction),
-    % check_push_direction(Board, FromRow, FromCol, Direction).
-    % write the direction of the push
     write('Pushing '), write(Piece), write(' from '), write(FromRow), write('-'), write(FromCol), write(' to '), write(ToRow), write('-'), write(ToCol), write(' in direction '), write(Direction), nl,
-    push_pieces_in_direction(GameState, FromRow, FromCol, Direction, NewGameState).
+    push_pieces_in_direction(GameState, FromRow, FromCol, Direction, TempGameState),
+    TempGameState = [NewBoard, Player, MovesLeft, NewPiecesLeft, Anchor, AnchorPosition],
+    AnchorPosition = [AnchorRow, AnchorCol],
+    ((Anchor == nonexistent) ->
+        set_piece(NewBoard, ToRow1, ToCol1, red_anchor, NewBoard1),
+        NewGameState = [NewBoard1, Player, MovesLeft, NewPiecesLeft, Piece1, [ToRow1, ToCol1]]
+    ; 
+        set_piece(NewBoard, AnchorRow, AnchorCol, Anchor, NewBoard1),
+        set_piece(NewBoard1, ToRow1, ToCol1, red_anchor, NewBoard2),
+        NewGameState = [NewBoard2, Player, MovesLeft, NewPiecesLeft, Piece1, [ToRow1, ToCol1]]
+    ).
+    
 
 % Define valid directions for pushing (up, down, left, right).
 valid_direction(FromRow, FromCol, ToRow, ToCol, up) :-
@@ -195,11 +205,17 @@ valid_direction(FromRow, FromCol, ToRow, ToCol, right) :-
 % cell at the end of a line of pieces in the direction of the push
 check_push_direction(Board, FromRow, FromCol, Direction) :-
     valid_direction_push(Direction),
+    % return false if anchor is found in current piece, if not continue
+    get_piece(Board, FromRow, FromCol, PieceTmp),
+    (PieceTmp == red_anchor -> false; true),
     adjacent_cell(FromRow, FromCol, Direction, NewRow, NewCol),
     get_piece(Board, NewRow, NewCol, Piece),
     write('Checking push direction: '), write(Direction), write(' from '), write(FromRow), write('-'), write(FromCol), write(' to '), write(NewRow), write('-'), write(NewCol), write(' with piece '), write(Piece), nl,
-    ((Piece == empty; Piece == nonexistent) -> true; check_push_direction(Board, NewRow, NewCol, Direction)).
-
+    ((Piece == empty; Piece == nonexistent) -> 
+        true
+    ;
+        check_push_direction(Board, NewRow, NewCol, Direction)
+    ).
 
 % Predicate to push a piece in the direction of another piece.
 push_pieces_in_direction(GameState, FromRow, FromCol, Direction, NewGameState) :-
@@ -297,15 +313,23 @@ move(GameState, Move, NewGameState) :-
     (member(Piece, PlayerPieces) ->
 
         (MovesLeft > 0 -> % There are moves left for the current player.
-            (is_clear_path(Board, FromRow, FromCol, ToRow, ToCol) ->
-                set_piece(Board, ToRow, ToCol, Piece, NewBoard),
-                remove_piece(NewBoard, FromRow, FromCol, NewBoard1),
+            % if starting position and end position are the same, skip the move
+            ((FromRow = ToRow, FromCol = ToCol) ->
+                write('You skipped this play'), nl,
+                % decrease play count 
                 NewMovesLeft is MovesLeft - 1,
-                NewGameState = [NewBoard1, Player, NewMovesLeft, PiecesLeft, Anchor, AnchorPosition]
-
+                NewGameState = [Board, Player, NewMovesLeft, PiecesLeft, Anchor, AnchorPosition]
             ;
-                write('Invalid move. Try again.'), nl,
-                NewGameState = GameState % Return the original game state
+                (is_clear_path(Board, FromRow, FromCol, ToRow, ToCol) ->
+                    set_piece(Board, ToRow, ToCol, Piece, NewBoard),
+                    remove_piece(NewBoard, FromRow, FromCol, NewBoard1),
+                    NewMovesLeft is MovesLeft - 1,
+                    NewGameState = [NewBoard1, Player, NewMovesLeft, PiecesLeft, Anchor, AnchorPosition]
+
+                ;
+                    write('Invalid move. Try again.'), nl,
+                    NewGameState = GameState % Return the original game state
+                )
             )
         ;
             write('aadsfasdf'), nl,
@@ -320,12 +344,13 @@ move(GameState, Move, NewGameState) :-
 
                         write('Valid push'), nl,
                         % Push the piece in the direction of the second piece
-                        push_piece(GameState, FromRow, FromCol, ToRow, ToCol, TempGameState),
-                        TempGameState = [NewBoard, Player, MovesLeft, NewPiecesLeft, Anchor, AnchorPosition],
-
+                        push_piece(GameState, FromRow, FromCol, ToRow, ToCol, TempGameStateLol),
+                        write('Temp game state: '), write(TempGameStateLol), nl,
+                        TempGameStateLol = [NewBoard1, Player1, MovesLeft1, NewPiecesLeft1, Anchor1, AnchorPosition1],
                         % advance to next player
-                        next_player(Player, NextPlayer),
-                        NewGameState = [NewBoard, NextPlayer, 2, NewPiecesLeft, Anchor, AnchorPosition]
+                        next_player(Player1, NextPlayer),
+                        write('Next player: '), write(NextPlayer), nl,
+                        NewGameState = [NewBoard1, NextPlayer, 2, NewPiecesLeft1, Anchor1, AnchorPosition1]
                     ;
                         write('Need at least an empty or nonexistent cell at the end of the line of pieces to push.'), nl,
                         NewGameState = GameState % Return the original game state
