@@ -338,11 +338,44 @@ move(GameState, Move, NewGameState) :-
         NewGameState = GameState % Return the original game state
     ).
 
-% Update the 'play' predicate to use GameState
+% Predicate that starts the game with a stylized menu
 play :-
+    draw_border,
+    write('|        Welcome to Push Fight!        |'), nl,
+    draw_border,
+    write('|                                      |'), nl,
+    write('|   Please select an option:           |'), nl,
+    write('|                                      |'), nl,
+    write('|   1. Play with another player        |'), nl,
+    write('|   2. Play against the PC             |'), nl,
+    write('|                                      |'), nl,
+    draw_border,
+    read_choice(Choice),
+    perform_action(Choice).
+
+% Helper predicate to draw a border
+draw_border :-
+    write('+--------------------------------------+'), nl.
+
+% Helper predicate to read the users choice and validate it
+read_choice(Choice) :-
+    repeat,
+    write('| Enter your choice (1 or 2): '),
+    read(Input),
+    draw_border,
+    ( Input == 1; Input == 2 ), !,
+    Choice = Input.
+
+% Helper predicate to act on the users choice
+perform_action(1) :-
+    write('You have chosen to play with another player.'), nl,nl,
     initial_state(_, GameState), % Initialize the game state
-    % display_game(GameState), % Display the initial game state
-    play_game(GameState).
+    play_game(GameState). % Start the game between two players
+
+perform_action(2) :-
+    write('You have chosen to play against the PC.'), nl, nl.
+    % initial_state(_, GameState), % Initialize the game state
+    % play_gamerobot(GameState). % Start the game against the PC
 
 % Update 'play_game' to use 'move' predicate
 play_game(GameState) :-
