@@ -2,12 +2,12 @@
 
 % Initialize the game board as a 6x10 matrix.
 initial_board([
-    [nonexistent, nonexistent, nonexistent, wall,  wall,         wall,         wall,  wall,        nonexistent, nonexistent],
-    [nonexistent, nonexistent, nonexistent, empty, brown_round,        empty,        empty, empty,       nonexistent, nonexistent],
-    [nonexistent, empty,       empty,       empty, white_square, brown_round,  brown_square, empty,       empty,       nonexistent],
-    [nonexistent, empty,       empty,       empty, white_round,  brown_square, empty, empty,       empty,       nonexistent],
-    [nonexistent, nonexistent, empty,       empty, empty,        empty,        empty, nonexistent, nonexistent, nonexistent],
-    [nonexistent, nonexistent, wall,        wall,  wall,         wall,         wall,  nonexistent, nonexistent, nonexistent]
+    [nonexistent, nonexistent, nonexistent, wall,        wall,         wall,         wall,         wall,        nonexistent, nonexistent],
+    [nonexistent, nonexistent, nonexistent, empty,       white_square, brown_round,  empty,        empty,       nonexistent, nonexistent],
+    [nonexistent, empty,       empty,       white_round, white_square, brown_square, empty,        empty,       empty,       nonexistent],
+    [nonexistent, empty,       empty,       empty,       white_square, brown_square, brown_round,  empty,       empty,       nonexistent],
+    [nonexistent, nonexistent, empty,       empty,       white_round,  brown_square, empty,        nonexistent, nonexistent, nonexistent],
+    [nonexistent, nonexistent, wall,        wall,        wall,         wall,         wall,         nonexistent, nonexistent, nonexistent]
 ]).
 
 % Define players
@@ -39,7 +39,7 @@ player_pieces(brown, [brown_round, brown_square]).
 initial_state(Size, GameState) :-
     initial_board(Board),
     player(white),
-    GameState = [Board, white, 2, [2, 2], nonexistent, [0, 0]].
+    GameState = [Board, white, 2, [5, 5], nonexistent, [0, 0]].
 
 % display_game(+GameState)
 display_game(GameState) :-
