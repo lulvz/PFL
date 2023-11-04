@@ -3,8 +3,8 @@
 % Initialize the game board as a 6x10 matrix.
 initial_board([
     [nonexistent, nonexistent, nonexistent, wall,  wall,         wall,         wall,  wall,        nonexistent, nonexistent],
-    [nonexistent, nonexistent, nonexistent, empty, empty,        empty,        empty, empty,       nonexistent, nonexistent],
-    [nonexistent, empty,       empty,       empty, white_square, brown_round, nonexistent, empty,       empty,       nonexistent],
+    [nonexistent, nonexistent, nonexistent, empty, brown_round,        empty,        empty, empty,       nonexistent, nonexistent],
+    [nonexistent, empty,       empty,       empty, white_square, brown_round,  empty, empty,       empty,       nonexistent],
     [nonexistent, empty,       empty,       empty, white_round,  brown_square, empty, empty,       empty,       nonexistent],
     [nonexistent, nonexistent, empty,       empty, empty,        empty,        empty, nonexistent, nonexistent, nonexistent],
     [nonexistent, nonexistent, wall,        wall,  wall,         wall,         wall,  nonexistent, nonexistent, nonexistent]
@@ -165,6 +165,7 @@ push_piece(GameState, FromRow, FromCol, ToRow, ToCol, NewGameState) :-
     GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
     get_piece(Board, FromRow, FromCol, Piece),
     valid_direction(FromRow, FromCol, ToRow, ToCol, Direction),
+    % check_push_direction(Board, FromRow, FromCol, Direction).
     % write the direction of the push
     write('Pushing '), write(Piece), write(' from '), write(FromRow), write('-'), write(FromCol), write(' to '), write(ToRow), write('-'), write(ToCol), write(' in direction '), write(Direction), nl,
     push_pieces_in_direction(GameState, FromRow, FromCol, Direction, NewGameState).
@@ -174,7 +175,7 @@ valid_direction(FromRow, FromCol, ToRow, ToCol, up) :-
     FromRow > ToRow,
     FromCol = ToCol.
 valid_direction(FromRow, FromCol, ToRow, ToCol, down) :-
-    FromRow < ToRow,
+    FromRow < ToRow,valid_direction()
     FromCol = ToCol.
 valid_direction(FromRow, FromCol, ToRow, ToCol, left) :-
     FromRow = ToRow,
@@ -182,6 +183,17 @@ valid_direction(FromRow, FromCol, ToRow, ToCol, left) :-
 valid_direction(FromRow, FromCol, ToRow, ToCol, right) :-
     FromRow = ToRow,
     FromCol < ToCol.
+
+% Predicate to check if the push direction is valid.
+% Direction is valid if there is at least one empty or nonexistent 
+% cell at the end of a line of pieces in the direction of the push
+check_push_direction(Board, FromRow, FromCol, Direction) :-
+    valid_direction_push(Direction),
+    adjacent_cell(FromRow, FromCol, Direction, NewRow, NewCol),
+    get_piece(Board, NewRow, NewCol, Piece),
+    write('Checking push direction: '), write(Direction), write(' from '), write(FromRow), write('-'), write(FromCol), write(' to '), write(NewRow), write('-'), write(NewCol), write(' with piece '), write(Piece), nl,
+    ((Piece == empty; Piece == nonexistent) -> true; check_push_direction(Board, NewRow, NewCol, Direction)).
+
 
 % Predicate to push a piece in the direction of another piece.
 push_pieces_in_direction(GameState, FromRow, FromCol, Direction, NewGameState) :-
@@ -246,15 +258,23 @@ valid_direction_push(down).
 valid_direction_push(left).
 valid_direction_push(right).
 
-% Calculate the coordinates of the adjacent cell in a given direction
+% Calculate the coordinates of the adjacent cell in a given direction without going out of bounds
 adjacent_cell(Row, Col, up, NewRow, Col) :-
-    NewRow is Row - 1.
+    NewRow is Row - 1,
+    NewRow >= 1. % Ensure the new row is within bounds.
+
 adjacent_cell(Row, Col, down, NewRow, Col) :-
-    NewRow is Row + 1.
+    NewRow is Row + 1,
+    NewRow =< 6. % Ensure the new row is within bounds.
+
 adjacent_cell(Row, Col, left, Row, NewCol) :-
-    NewCol is Col - 1.
+    NewCol is Col - 1,
+    NewCol >= 1. % Ensure the new column is within bounds.
+
 adjacent_cell(Row, Col, right, Row, NewCol) :-
-    NewCol is Col + 1.
+    NewCol is Col + 1,
+    NewCol =< 10. % Ensure the new column is within bounds.
+
 
 % Move Validation and Execution
 % move(+GameState, +Move, -NewGameState)
@@ -296,17 +316,25 @@ move(GameState, Move, NewGameState) :-
             % validate piece is a square
             ((Piece = white_square; Piece = brown_square) ->
                 write('Validating push: '), write(Piece), write(' from '), write(FromRow), write('-'), write(FromCol), write(' to '), write(ToRow), write('-'), write(ToCol), nl,
-                % validate the piece is adjacent to another piece
+                % validate the piece is adjacent to another piece and the push can be completed
                 (valid_neighbor_push(Board, FromRow, FromCol, ToRow, ToCol) ->
-                    % Push the piece in the direction of the second piece
-                    push_piece(GameState, FromRow, FromCol, ToRow, ToCol, TempGameState),
-                    TempGameState = [NewBoard, Player, MovesLeft, NewPiecesLeft, Anchor, AnchorPosition],
+                    valid_direction(FromRow, FromCol, ToRow, ToCol, Direction),
+                    (check_push_direction(Board, FromRow, FromCol, Direction) ->
 
-                    % advance to next player
-                    next_player(Player, NextPlayer),
-                    NewGameState = [NewBoard, NextPlayer, 2, NewPiecesLeft, Anchor, AnchorPosition]
+                        write('Valid push'), nl,
+                        % Push the piece in the direction of the second piece
+                        push_piece(GameState, FromRow, FromCol, ToRow, ToCol, TempGameState),
+                        TempGameState = [NewBoard, Player, MovesLeft, NewPiecesLeft, Anchor, AnchorPosition],
+
+                        % advance to next player
+                        next_player(Player, NextPlayer),
+                        NewGameState = [NewBoard, NextPlayer, 2, NewPiecesLeft, Anchor, AnchorPosition]
+                    ;
+                        write('Need at least an empty or nonexistent cell at the end of the line of pieces to push.'), nl,
+                        NewGameState = GameState % Return the original game state
+                    )
                 ;
-                    write('Invalid second piece.'), nl,
+                    write('Push direction must be a player piece adjacent to the piece you are pushing.'), nl,
                     NewGameState = GameState % Return the original game state
                 )
             ;
