@@ -32,18 +32,18 @@ piece(red_anchor).
 player_pieces(white, [white_round, white_square]).
 player_pieces(brown, [brown_round, brown_square]).
 
-% Gamestate([Board, Player, MovesLeft, PiecesLeft], Anchor) PiecesLeft is a list of the number of pieces left for each player.
-% Anchor is the cell that the anchor is currently on top of (can only be squares)
+% Gamestate([Board, Player, MovesLeft, [WhitePiecesLeft, BrownPiecesLeft], Anchor, AnchorPosition]) PiecesLeft is a list of the number of pieces left for each player.
+% Anchor is the cell that the anchor is currently on top of (can only be squares) and AnchorPosition is the position of the anchor on the board.
 % Game state that contains the board, curren player, number of moves left, if user is in push phase, and the number of pieces left for each player.
 % initial_state(+Size, -GameState) Size is not used because the board of this game is kinda weird.
 initial_state(Size, GameState) :-
     initial_board(Board),
     player(white),
-    GameState = [Board, white, 2, [2, 2], nonexistent].
+    GameState = [Board, white, 2, [2, 2], nonexistent, [0, 0]].
 
 % display_game(+GameState)
 display_game(GameState) :-
-    GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor],
+    GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
 
     % Padding
     write('#############################################'), nl,
@@ -55,6 +55,7 @@ display_game(GameState) :-
     % write the number of pieces left for each player.
     write('Pieces left [white,brown]: '), write(PiecesLeft), nl,
     write('Anchor currently on top of: '), display_cell(Anchor), nl,
+    write('Anchor position: '), write(AnchorPosition), nl,
     
     display_board(Board),
 
@@ -163,6 +164,8 @@ get_piece(Board, I, J, Piece) :-
 push_piece(Board, FromRow, FromCol, ToRow, ToCol, NewBoard) :-
     get_piece(Board, FromRow, FromCol, Piece),
     valid_direction(FromRow, FromCol, ToRow, ToCol, Direction),
+    % write the direction of the push
+    write('Pushing '), write(Piece), write(' from '), write(FromRow), write('-'), write(FromCol), write(' to '), write(ToRow), write('-'), write(ToCol), write(' in direction '), write(Direction), nl,
     push_pieces_in_direction(Board, FromRow, FromCol, Direction, NewBoard).
 
 % Define valid directions for pushing (up, down, left, right).
@@ -179,17 +182,59 @@ valid_direction(FromRow, FromCol, ToRow, ToCol, right) :-
     FromRow = ToRow,
     FromCol < ToCol.
 
-% Shifts all game pieces touching the start one in a given direction. (white_square, brown_square, white_round, brown_round)
+% Predicate to push a piece in the direction of another piece.
 push_pieces_in_direction(Board, FromRow, FromCol, Direction, NewBoard) :-
-    write('Pushing pieces in direction: '), write(Direction), nl,
-    % return the board
-    NewBoard = Board.
+    get_piece(Board, FromRow, FromCol, Piece),
+    push_recursive(Board, FromRow, FromCol, Direction, Piece, NewBoard).
+
+% Base case: No more pieces to push
+% push_recursive(Board, _, _, _, _, Board).
+
+% Recursive case: Push pieces in the specified direction
+push_recursive(Board, Row, Col, Direction, Piece, NewBoard) :-
+    write('Direction: '), write(Direction), nl,
+    valid_direction_push(Direction),
+    write('Valid direction: '), write(Direction), nl,
+    adjacent_cell(Row, Col, Direction, NewRow, NewCol),
+    write('Adjacent cell: '), write(NewRow), write('-'), write(NewCol), nl,
+    get_piece(Board, NewRow, NewCol, NewPiece),
+    write('New piece: '), write(NewPiece), nl,
+    % If the adjacent cell is empty, move the current piece to that cell
+    % and recursively continue pushing the remaining pieces
+    ((NewPiece == white_round; NewPiece == white_square; NewPiece == brown_round; NewPiece == brown_square) ->
+        write('Got in here'), nl,
+        set_piece(Board, NewRow, NewCol, Piece, TempBoard),
+        remove_piece(TempBoard, Row, Col, TempBoard2),
+        push_recursive(TempBoard2, NewRow, NewCol, Direction, NewPiece, NewBoard)
+    ;
+        (is_empty(NewPiece) ->
+            set_piece(Board, NewRow, NewCol, Piece, NewBoard)
+        ;
+        NewBoard = Board
+        )
+    ).
+
+% Define valid directions for pushing (up, down, left, right).
+valid_direction_push(up).
+valid_direction_push(down).
+valid_direction_push(left).
+valid_direction_push(right).
+
+% Calculate the coordinates of the adjacent cell in a given direction
+adjacent_cell(Row, Col, up, NewRow, Col) :-
+    NewRow is Row - 1.
+adjacent_cell(Row, Col, down, NewRow, Col) :-
+    NewRow is Row + 1.
+adjacent_cell(Row, Col, left, Row, NewCol) :-
+    NewCol is Col - 1.
+adjacent_cell(Row, Col, right, Row, NewCol) :-
+    NewCol is Col + 1.
 
 % Move Validation and Execution
 % move(+GameState, +Move, -NewGameState)
 % Move format: move([FromRow, FromCol, ToRow, ToCol])
 move(GameState, Move, NewGameState) :-
-    GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor],
+    GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
 
     Move = [FromRow, FromCol, ToRow, ToCol],
 
@@ -203,7 +248,7 @@ move(GameState, Move, NewGameState) :-
                 set_piece(Board, ToRow, ToCol, Piece, NewBoard),
                 remove_piece(NewBoard, FromRow, FromCol, NewBoard1),
                 NewMovesLeft is MovesLeft - 1,
-                NewGameState = [NewBoard1, Player, NewMovesLeft, PiecesLeft, Anchor],
+                NewGameState = [NewBoard1, Player, NewMovesLeft, PiecesLeft, Anchor, AnchorPosition],
 
                 % Check if the player has won
                 (PiecesLeft = [0, 0] ->
@@ -232,7 +277,7 @@ move(GameState, Move, NewGameState) :-
 
                     % advance to next player
                     next_player(Player, NextPlayer),
-                    NewGameState = [NewBoard, NextPlayer, 2, PiecesLeft, Anchor]
+                    NewGameState = [NewBoard, NextPlayer, 2, PiecesLeft, Anchor, AnchorPosition]
                 ;
                     write('Invalid second piece.'), nl,
                     NewGameState = GameState % Return the original game state
@@ -255,7 +300,7 @@ play :-
 
 % Update 'play_game' to use 'move' predicate
 play_game(GameState) :-
-    GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor],
+    GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
 
     (MovesLeft > 0 -> % There are moves left for the current player.
         % Display the game state
