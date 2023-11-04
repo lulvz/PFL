@@ -4,7 +4,7 @@
 initial_board([
     [nonexistent, nonexistent, nonexistent, wall,  wall,         wall,         wall,  wall,        nonexistent, nonexistent],
     [nonexistent, nonexistent, nonexistent, empty, brown_round,        empty,        empty, empty,       nonexistent, nonexistent],
-    [nonexistent, empty,       empty,       empty, white_square, brown_round,  empty, empty,       empty,       nonexistent],
+    [nonexistent, empty,       empty,       empty, white_square, brown_round,  brown_square, empty,       empty,       nonexistent],
     [nonexistent, empty,       empty,       empty, white_round,  brown_square, empty, empty,       empty,       nonexistent],
     [nonexistent, nonexistent, empty,       empty, empty,        empty,        empty, nonexistent, nonexistent, nonexistent],
     [nonexistent, nonexistent, wall,        wall,  wall,         wall,         wall,  nonexistent, nonexistent, nonexistent]
@@ -175,7 +175,7 @@ valid_direction(FromRow, FromCol, ToRow, ToCol, up) :-
     FromRow > ToRow,
     FromCol = ToCol.
 valid_direction(FromRow, FromCol, ToRow, ToCol, down) :-
-    FromRow < ToRow,valid_direction()
+    FromRow < ToRow,
     FromCol = ToCol.
 valid_direction(FromRow, FromCol, ToRow, ToCol, left) :-
     FromRow = ToRow,
@@ -199,7 +199,9 @@ check_push_direction(Board, FromRow, FromCol, Direction) :-
 push_pieces_in_direction(GameState, FromRow, FromCol, Direction, NewGameState) :-
     GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
     get_piece(Board, FromRow, FromCol, Piece),
-    push_recursive(GameState, FromRow, FromCol, Direction, Piece, NewGameState).
+    remove_piece(Board, FromRow, FromCol, TempBoard),
+    TempGameState = [TempBoard, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
+    push_recursive(TempGameState, FromRow, FromCol, Direction, Piece, NewGameState).
 
 % Base case: No more pieces to push
 % push_recursive(Board, _, _, _, _, Board).
@@ -214,21 +216,20 @@ push_recursive(GameState, Row, Col, Direction, Piece, NewGameState) :-
     write('Adjacent cell: '), write(NewRow), write('-'), write(NewCol), nl,
     get_piece(Board, NewRow, NewCol, NewPiece),
     write('New piece: '), write(NewPiece), nl,
-    % If the adjacent cell is empty, move the current piece to that cell
-    % and recursively continue pushing the remaining pieces
+
     ((NewPiece == white_round; NewPiece == white_square; NewPiece == brown_round; NewPiece == brown_square) ->
         write('Got in here'), nl,
         set_piece(Board, NewRow, NewCol, Piece, TempBoard),
-        TempGameState = [TempBoard, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
-        remove_piece(TempBoard, Row, Col, TempBoard2),
-        TempGameState2 = [TempBoard2, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
+        write('Temp board: '), display_board(TempBoard), nl,
+        % remove_piece(TempBoard, Row, Col, TempBoard2),
+        % write('Temp board 2: '), display_board(TempBoard2), nl,
+        TempGameState2 = [TempBoard, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
         push_recursive(TempGameState2, NewRow, NewCol, Direction, NewPiece, NewGameState)
     ;
         (is_empty(NewPiece) ->
             set_piece(Board, NewRow, NewCol, Piece, NewBoard),
             NewGameState = [NewBoard, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition]
         ;
-        
             ((NewPiece == nonexistent) ->
                 % The Piece we are holding in the function essentially disappears and we decrease the piece count of the player that has the piece we are holding
                 % PiecesLeft = [WhitePiecesLeft, BrownPiecesLeft]
@@ -294,17 +295,7 @@ move(GameState, Move, NewGameState) :-
                 set_piece(Board, ToRow, ToCol, Piece, NewBoard),
                 remove_piece(NewBoard, FromRow, FromCol, NewBoard1),
                 NewMovesLeft is MovesLeft - 1,
-                NewGameState = [NewBoard1, Player, NewMovesLeft, PiecesLeft, Anchor, AnchorPosition],
-
-                % Check if the player has won
-                (PiecesLeft = [0, 0] ->
-                    write('Player '), write(Player), write(' has won!'), nl,
-                    abort
-
-                % Continue the play_game phase
-                ;
-                    true
-                )
+                NewGameState = [NewBoard1, Player, NewMovesLeft, PiecesLeft, Anchor, AnchorPosition]
 
             ;
                 write('Invalid move. Try again.'), nl,
@@ -357,6 +348,20 @@ play :-
 play_game(GameState) :-
     GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
 
+    % Check if the player has won
+    PiecesLeft = [WhitePiecesLeft, BrownPiecesLeft],
+    (WhitePiecesLeft = 0 ->
+        write('Player brown has won!'), nl,
+        abort
+    ;
+        true
+    ),
+    (BrownPiecesLeft = 0 ->
+        write('Player white has won!'), nl,
+        abort
+    ;
+        true
+    ),
     (MovesLeft > 0 -> % There are moves left for the current player.
         % Display the game state
         display_game(GameState),
