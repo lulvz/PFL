@@ -382,7 +382,8 @@ play :-
     write('|                                      |'), nl,
     draw_border,
     read_choice(Choice),
-    perform_action(Choice).
+    perform_action(Choice),
+    play.
 
 % Helper predicate to draw a border
 draw_border :-
@@ -408,56 +409,66 @@ perform_action(2) :-
     % initial_state(_, GameState), % Initialize the game state
     % play_gamerobot(GameState). % Start the game against the PC
 
+% game_over(+GameState, -Winner).
+% game_over takes the game state, checks if the game is over and returns the winner.
+game_over(GameState, Winner) :-
+    GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
+    PiecesLeft = [WhitePiecesLeft, BrownPiecesLeft],
+    (WhitePiecesLeft < 5 -> 
+        Winner = brown, 
+        true
+    ;
+        (BrownPiecesLeft < 5 -> 
+            Winner = white, 
+            true
+        ;
+            false
+        )
+    ).
+
 % Update 'play_game' to use 'move' predicate
 play_game(GameState) :-
     GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
-
-    % Check if the player has won
     PiecesLeft = [WhitePiecesLeft, BrownPiecesLeft],
-    (WhitePiecesLeft = 0 ->
-        write('Player brown has won!'), nl,
-        abort
-    ;
+
+    % Check if the game is over, else continue
+    (game_over(GameState, Winner) ->
+        write('Game over! Winner: '), write(Winner), nl,
         true
-    ),
-    (BrownPiecesLeft = 0 ->
-        write('Player white has won!'), nl,
-        abort
     ;
-        true
-    ),
-    (MovesLeft > 0 -> % There are moves left for the current player.
-        % Display the game state
-        display_game(GameState),
+        (MovesLeft > 0 -> % There are moves left for the current player.
+            % Display the game state
+            display_game(GameState),
 
-        write('Enter the coordinates of the piece you want to move(eg. i-j.):'), nl,
-        read(I-J),
-        write('Enter the coordinates of the destination(eg. i-j.):'), nl,
-        read(I2-J2),
+            write('Enter the coordinates of the piece you want to move(eg. i-j.):'), nl,
+            read(I-J),
+            write('Enter the coordinates of the destination(eg. i-j.):'), nl,
+            read(I2-J2),
 
-        % Construct the Move
-        Move = [I, J, I2, J2],
+            % Construct the Move
+            Move = [I, J, I2, J2],
 
-        % Validate and execute the move
-        move(GameState, Move, NewGameState),
+            % Validate and execute the move
+            move(GameState, Move, NewGameState),
 
-        % Continue the play_game phase
-        play_game(NewGameState)
-    ;
-        % Display the game state
-        display_game(GameState),
+            % Continue the play_game phase
+            play_game(NewGameState)
+        ;
+            % Display the game state
+            display_game(GameState),
 
-        write('Enter the coordinates of the piece you want to push(eg. i-j.):'), nl,
-        read(I-J),
-        write('Enter the coordinates of an adjacent piece to push(eg. i-j.):'), nl,
-        read(I2-J2),
+            write('Enter the coordinates of the piece you want to push(eg. i-j.):'), nl,
+            read(I-J),
+            write('Enter the coordinates of an adjacent piece to push(eg. i-j.):'), nl,
+            read(I2-J2),
 
-        % Construct the Move
-        Move = [I, J, I2, J2],
+            % Construct the Move
+            Move = [I, J, I2, J2],
 
-        % Validate and execute the move
-        move(GameState, Move, NewGameState),
+            % Validate and execute the move
+            move(GameState, Move, NewGameState),
 
-        % Continue the play_game phase
-        play_game(NewGameState)   
+            % Continue the play_game phase
+            play_game(NewGameState)
+        )
     ).
