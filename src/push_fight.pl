@@ -1,4 +1,5 @@
 :- use_module(library(lists)).
+:- use_module(library(random)).
 
 % Initialize the game board as a 6x10 matrix.
 initial_board([
@@ -63,6 +64,10 @@ display_game(GameState) :-
 
 % Predicate to check if a cell is empty or an anchor.
 is_empty(empty).
+
+is_empty(Board, I, J) :-
+    get_piece(Board, I, J, Piece),
+    is_empty(Piece).
 
 % Predicate to check if the move is valid.
 is_valid_move(Board, I, J, I2, J2, Player) :-
@@ -332,7 +337,6 @@ move(GameState, Move, NewGameState) :-
                 )
             )
         ;
-            write('aadsfasdf'), nl,
             % Push phase
             % validate piece is a square
             ((Piece = white_square; Piece = brown_square) ->
@@ -367,6 +371,50 @@ move(GameState, Move, NewGameState) :-
     ;
         write('You cannot move this piece. Try again.'), nl,
         NewGameState = GameState % Return the original game state
+    ).
+
+% List of Valid Moves: describe how to obtain a list of possible moves. The predicate should be named
+% valid_moves(+GameState, +Player, -ListOfMoves).
+valid_moves(GameState, PlayerSelected, ListOfMoves) :-
+    GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
+    % check if it's push stage for the player
+    (MovesLeft = 0 ->
+    % Push stage
+        (PlayerSelected == white ->
+            findall([FromRow, FromCol, ToRow, ToCol], 
+                (member(Piece, [white_square]),
+                get_piece(Board, FromRow, FromCol, Piece),
+                valid_neighbor_push(Board, FromRow, FromCol, ToRow, ToCol),
+                valid_direction(FromRow, FromCol, ToRow, ToCol, Direction),
+                check_push_direction(Board, FromRow, FromCol, Direction)
+                ),
+            ListOfMoves)
+        ;
+            (PlayerSelected == brown ->
+                findall([FromRow, FromCol, ToRow, ToCol], 
+                    (member(Piece, [brown_square]),
+                    get_piece(Board, FromRow, FromCol, Piece),
+                    valid_neighbor_push(Board, FromRow, FromCol, ToRow, ToCol),
+                    valid_direction(FromRow, FromCol, ToRow, ToCol, Direction),
+                    check_push_direction(Board, FromRow, FromCol, Direction)
+                    ),
+                ListOfMoves)
+            ;
+                ListOfMoves = []
+            )   
+        )
+        % A piece can only push another piece that is next to it, and the push must be valid
+        %   can only push with square piece
+        
+    ;
+    % Not push stage
+        player_pieces(PlayerSelected, PlayerPieces),
+        findall([FromRow, FromCol, ToRow, ToCol], 
+            (member(Piece, PlayerPieces),
+            get_piece(Board, FromRow, FromCol, Piece),
+            is_clear_path(Board, FromRow, FromCol, ToRow, ToCol),
+            is_empty(Board, ToRow, ToCol)), 
+        ListOfMoves)
     ).
 
 % Predicate that starts the game with a stylized menu
@@ -405,9 +453,9 @@ perform_action(1) :-
     play_game(GameState). % Start the game between two players
 
 perform_action(2) :-
-    write('You have chosen to play against the PC.'), nl, nl.
-    % initial_state(_, GameState), % Initialize the game state
-    % play_gamerobot(GameState). % Start the game against the PC
+    write('You have chosen to play against the PC.'), nl, nl,
+    initial_state(_, GameState), % Initialize the game state
+    play_game_robot(GameState). % Start the game against the PC
 
 % game_over(+GameState, -Winner).
 % game_over takes the game state, checks if the game is over and returns the winner.
@@ -426,7 +474,6 @@ game_over(GameState, Winner) :-
         )
     ).
 
-% Update 'play_game' to use 'move' predicate
 play_game(GameState) :-
     GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
     PiecesLeft = [WhitePiecesLeft, BrownPiecesLeft],
@@ -439,6 +486,7 @@ play_game(GameState) :-
         (MovesLeft > 0 -> % There are moves left for the current player.
             % Display the game state
             display_game(GameState),
+            % print out all the valid moves
 
             write('Enter the coordinates of the piece you want to move(eg. i-j.):'), nl,
             read(I-J),
@@ -457,18 +505,141 @@ play_game(GameState) :-
             % Display the game state
             display_game(GameState),
 
+            write('If you are stuck you lose, so enter the same coords for start and end.'), nl,
             write('Enter the coordinates of the piece you want to push(eg. i-j.):'), nl,
             read(I-J),
             write('Enter the coordinates of an adjacent piece to push(eg. i-j.):'), nl,
             read(I2-J2),
 
-            % Construct the Move
-            Move = [I, J, I2, J2],
+            % if origin and destination are the same, lose the game
+            (I = I2, J = J2 -> 
+                (Player == white ->
+                    write('You lose.'), nl,
+                    PiecesLeft = [WhitePiecesLeft, BrownPiecesLeft],
+                    NewWhitePiecesLeft is WhitePiecesLeft - 1,
+                    NewGameState = [Board, Player, MovesLeft, [NewWhitePiecesLeft, BrownPiecesLeft], Anchor, AnchorPosition]
+                ;
+                    write('You lose.'), nl,
+                    PiecesLeft = [WhitePiecesLeft, BrownPiecesLeft],
+                    NewBrownPiecesLeft is BrownPiecesLeft - 1,
+                    NewGameState = [Board, Player, MovesLeft, [WhitePiecesLeft, NewBrownPiecesLeft], Anchor, AnchorPosition]
+                )
+            ;
+                % Construct the Move
+                Move = [I, J, I2, J2],
 
-            % Validate and execute the move
-            move(GameState, Move, NewGameState),
+                % Validate and execute the move
+                move(GameState, Move, NewGameState)
+            ),
 
             % Continue the play_game phase
             play_game(NewGameState)
+        )
+    ).
+
+play_game_robot(GameState) :-
+    GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
+    PiecesLeft = [WhitePiecesLeft, BrownPiecesLeft],
+
+    % Check if the game is over, else continue
+    (game_over(GameState, Winner) ->
+        write('Game over! Winner: '), write(Winner), nl,
+        true
+    ;
+        % white is the player, brown is the bot
+        (Player == white -> 
+            (MovesLeft > 0 -> % There are moves left for the current player.
+                % Display the game state
+                display_game(GameState),
+                % print out all the valid moves
+
+                write('Enter the coordinates of the piece you want to move(eg. i-j.):'), nl,
+                read(I-J),
+                write('Enter the coordinates of the destination(eg. i-j.):'), nl,
+                read(I2-J2),
+
+                % Construct the Move
+                Move = [I, J, I2, J2],
+
+                % Validate and execute the move
+                move(GameState, Move, NewGameState),
+
+                % Continue the play_game phase
+                play_game_robot(NewGameState)
+            ;
+                % Display the game state
+                display_game(GameState),
+                % print out all the valid moves
+
+                write('If you are stuck you lose, so enter the same coords for start and end.'), nl,
+                write('Enter the coordinates of the piece you want to push(eg. i-j.):'), nl,
+                read(I-J),
+                write('Enter the coordinates of an adjacent piece to push(eg. i-j.):'), nl,
+                read(I2-J2),
+
+                % if origin and destination are the same, lose the game
+                (I = I2, J = J2 -> 
+                    write('You lose.'), nl,
+                    PiecesLeft = [WhitePiecesLeft, BrownPiecesLeft],
+                    NewWhitePiecesLeft is WhitePiecesLeft - 1,
+                    NewGameState = [Board, Player, MovesLeft, [NewWhitePiecesLeft, BrownPiecesLeft], Anchor, AnchorPosition]
+                ;
+                    % Construct the Move
+                    Move = [I, J, I2, J2],
+
+                    % Validate and execute the move
+                    move(GameState, Move, NewGameState)
+                ),
+                % Continue the play_game phase
+                play_game_robot(NewGameState)
+            )
+        ;
+            % bot
+            (MovesLeft > 0 -> % There are moves left for the current player.
+                % Display the game state
+                display_game(GameState),
+                % print out all the valid moves
+
+                write('CALCULATING ALL POSSIBLE MOVES AND CHOOSINGs'), nl,
+
+                valid_moves(GameState, brown, ListOfMoves),
+                write('Valid moves: '), write(ListOfMoves), nl,
+                (ListOfMoves = [] ->
+                    write('No valid moves. Skipping turn.'), nl,
+                    NewGameState = GameState
+                ;
+                    % Choose a random move from the list of valid moves
+                    random_member(Move, ListOfMoves),
+
+                    % Validate and execute the move
+                    move(GameState, Move, NewGameState)
+                ),
+
+                % Continue the play_game phase
+                play_game_robot(NewGameState)
+            ;
+                % Display the game state
+                display_game(GameState),
+                % print out all the valid moves
+
+                write('CALCULATING ALL POSSIBLE PUSHES AND CHOOSING'), nl,
+                valid_moves(GameState, brown, ListOfMoves),
+
+                (ListOfMoves = [] ->
+                    write('No valid pushes, bot loses.'), nl,
+                    PiecesLeft = [WhitePiecesLeft, BrownPiecesLeft],
+                    NewBrownPiecesLeft is BrownPiecesLeft - 1,
+                    NewGameState = [Board, Player, MovesLeft, [WhitePiecesLeft, NewBrownPiecesLeft], Anchor, AnchorPosition]
+                ;
+                    % Choose a random move from the list of valid moves
+                    random_member(Move, ListOfMoves),
+
+                    % Validate and execute the move
+                    move(GameState, Move, NewGameState)
+                ),
+
+                % Continue the play_game phase
+                play_game_robot(NewGameState)
+            )
         )
     ).
