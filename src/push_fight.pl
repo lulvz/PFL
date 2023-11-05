@@ -417,6 +417,15 @@ valid_moves(GameState, PlayerSelected, ListOfMoves) :-
         ListOfMoves)
     ).
 
+% choose_move(+GameState, +Player, +Level, -Move)
+choose_move(GameState, Player, 1, Move) :-
+    valid_moves(GameState, Player, ListOfMoves),
+    (ListOfMoves == [] -> 
+        Move = []
+    ;
+        random_member(Move, ListOfMoves)
+    ).
+
 % Predicate that starts the game with a stylized menu
 play :-
     draw_border,
@@ -602,14 +611,15 @@ play_game_robot(GameState) :-
 
                 write('CALCULATING ALL POSSIBLE MOVES AND CHOOSINGs'), nl,
 
-                valid_moves(GameState, brown, ListOfMoves),
-                write('Valid moves: '), write(ListOfMoves), nl,
-                (ListOfMoves = [] ->
+                % valid_moves(GameState, brown, ListOfMoves),
+                % write('Valid moves: '), write(ListOfMoves), nl,
+                choose_move(GameState, brown, 1, Move),
+                (Move == [] ->
                     write('No valid moves. Skipping turn.'), nl,
                     NewGameState = GameState
                 ;
                     % Choose a random move from the list of valid moves
-                    random_member(Move, ListOfMoves),
+                    % random_member(Move, ListOfMoves),
 
                     % Validate and execute the move
                     move(GameState, Move, NewGameState)
@@ -623,16 +633,18 @@ play_game_robot(GameState) :-
                 % print out all the valid moves
 
                 write('CALCULATING ALL POSSIBLE PUSHES AND CHOOSING'), nl,
-                valid_moves(GameState, brown, ListOfMoves),
+                % valid_moves(GameState, brown, ListOfMoves),
 
-                (ListOfMoves = [] ->
+                choose_move(GameState, brown, 1, Move),
+
+                (Move == [] ->
                     write('No valid pushes, bot loses.'), nl,
                     PiecesLeft = [WhitePiecesLeft, BrownPiecesLeft],
                     NewBrownPiecesLeft is BrownPiecesLeft - 1,
                     NewGameState = [Board, Player, MovesLeft, [WhitePiecesLeft, NewBrownPiecesLeft], Anchor, AnchorPosition]
                 ;
                     % Choose a random move from the list of valid moves
-                    random_member(Move, ListOfMoves),
+                    % random_member(Move, ListOfMoves),
 
                     % Validate and execute the move
                     move(GameState, Move, NewGameState)
