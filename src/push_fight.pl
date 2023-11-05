@@ -77,9 +77,7 @@ is_valid_move(Board, I, J, I2, J2, Player) :-
     member(Piece, PlayerPieces),
     get_piece(Board, I2, J2, Destination),
     is_empty(Destination),
-    write('Validating move: '), write(Piece), write(' from '), write(I), write('-'), write(J), write(' to '), write(I2), write('-'), write(J2), nl,
     is_clear_path(Board, I, J, I2, J2),
-    write('Clear path: '), write(I), write('-'), write(J), write(' to '), write(I2), write('-'), write(J2), nl.
 
 is_valid_move_direction(_, _, _, _, _). % Any piece can move in any direction.
 
@@ -177,7 +175,6 @@ push_piece(GameState, FromRow, FromCol, ToRow, ToCol, NewGameState) :-
     get_piece(Board, FromRow, FromCol, Piece),
     FromRow1 = FromRow, FromCol1 = FromCol, ToRow1 = ToRow, ToCol1 = ToCol, Piece1 = Piece,
     valid_direction(FromRow, FromCol, ToRow, ToCol, Direction),
-    write('Pushing '), write(Piece), write(' from '), write(FromRow), write('-'), write(FromCol), write(' to '), write(ToRow), write('-'), write(ToCol), write(' in direction '), write(Direction), nl,
     push_pieces_in_direction(GameState, FromRow, FromCol, Direction, TempGameState),
     TempGameState = [NewBoard, Player, MovesLeft, NewPiecesLeft, Anchor, AnchorPosition],
     AnchorPosition = [AnchorRow, AnchorCol],
@@ -215,7 +212,6 @@ check_push_direction(Board, FromRow, FromCol, Direction) :-
     (PieceTmp == red_anchor -> false; true),
     adjacent_cell(FromRow, FromCol, Direction, NewRow, NewCol),
     get_piece(Board, NewRow, NewCol, Piece),
-    write('Checking push direction: '), write(Direction), write(' from '), write(FromRow), write('-'), write(FromCol), write(' to '), write(NewRow), write('-'), write(NewCol), write(' with piece '), write(Piece), nl,
     ((Piece == empty; Piece == nonexistent) -> 
         true
     ;
@@ -236,20 +232,12 @@ push_pieces_in_direction(GameState, FromRow, FromCol, Direction, NewGameState) :
 % Recursive case: Push pieces in the specified direction
 push_recursive(GameState, Row, Col, Direction, Piece, NewGameState) :-
     GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
-    write('Direction: '), write(Direction), nl,
     valid_direction_push(Direction),
-    write('Valid direction: '), write(Direction), nl,
     adjacent_cell(Row, Col, Direction, NewRow, NewCol),
-    write('Adjacent cell: '), write(NewRow), write('-'), write(NewCol), nl,
     get_piece(Board, NewRow, NewCol, NewPiece),
-    write('New piece: '), write(NewPiece), nl,
 
     ((NewPiece == white_round; NewPiece == white_square; NewPiece == brown_round; NewPiece == brown_square) ->
-        write('Got in here'), nl,
         set_piece(Board, NewRow, NewCol, Piece, TempBoard),
-        write('Temp board: '), display_board(TempBoard), nl,
-        % remove_piece(TempBoard, Row, Col, TempBoard2),
-        % write('Temp board 2: '), display_board(TempBoard2), nl,
         TempGameState2 = [TempBoard, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
         push_recursive(TempGameState2, NewRow, NewCol, Direction, NewPiece, NewGameState)
     ;
@@ -261,16 +249,12 @@ push_recursive(GameState, Row, Col, Direction, Piece, NewGameState) :-
                 % The Piece we are holding in the function essentially disappears and we decrease the piece count of the player that has the piece we are holding
                 % PiecesLeft = [WhitePiecesLeft, BrownPiecesLeft]
                 PiecesLeft = [WhitePiecesLeft, BrownPiecesLeft],
-                write('Pieces left: '), write(PiecesLeft), nl,
 
                 ((Piece == white_round; Piece == white_square) ->
-                    write('White piece'), nl,
                     NewWhitePiecesLeft is WhitePiecesLeft - 1,
                     NewPiecesLeft = [NewWhitePiecesLeft, BrownPiecesLeft]
                 ;
-                    write('Brown piece'), nl,
                     NewBrownPiecesLeft is BrownPiecesLeft - 1,
-                    write('New brown pieces left: '), write(NewBrownPiecesLeft), nl,
                     NewPiecesLeft = [WhitePiecesLeft, NewBrownPiecesLeft]
                 ),
                 NewGameState = [Board, Player, MovesLeft, NewPiecesLeft, Anchor, AnchorPosition]
@@ -340,16 +324,13 @@ move(GameState, Move, NewGameState) :-
             % Push phase
             % validate piece is a square
             ((Piece = white_square; Piece = brown_square) ->
-                write('Validating push: '), write(Piece), write(' from '), write(FromRow), write('-'), write(FromCol), write(' to '), write(ToRow), write('-'), write(ToCol), nl,
                 % validate the piece is adjacent to another piece and the push can be completed
                 (valid_neighbor_push(Board, FromRow, FromCol, ToRow, ToCol) ->
                     valid_direction(FromRow, FromCol, ToRow, ToCol, Direction),
                     (check_push_direction(Board, FromRow, FromCol, Direction) ->
 
-                        write('Valid push'), nl,
                         % Push the piece in the direction of the second piece
                         push_piece(GameState, FromRow, FromCol, ToRow, ToCol, TempGameStateLol),
-                        write('Temp game state: '), write(TempGameStateLol), nl,
                         TempGameStateLol = [NewBoard1, Player1, MovesLeft1, NewPiecesLeft1, Anchor1, AnchorPosition1],
                         % advance to next player
                         next_player(Player1, NextPlayer),
@@ -377,7 +358,7 @@ move(GameState, Move, NewGameState) :-
 % valid_moves(+GameState, +Player, -ListOfMoves).
 valid_moves(GameState, PlayerSelected, ListOfMoves) :-
     GameState = [Board, Player, MovesLeft, PiecesLeft, Anchor, AnchorPosition],
-    % check if it's push stage for the player
+    % check if its push stage for the player
     (MovesLeft = 0 ->
     % Push stage
         (PlayerSelected == white ->
